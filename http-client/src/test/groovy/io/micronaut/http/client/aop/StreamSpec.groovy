@@ -18,7 +18,6 @@ package io.micronaut.http.client.aop
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -26,6 +25,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
@@ -130,6 +130,42 @@ class StreamSpec extends Specification {
         myClient.someJsonCollection() == '[{"x":1},{"x":2}]'
     }
 
+    @Unroll
+    void "JSON stream can still be streamed using Flowable as container"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJsonStreamCollection() == '{"x":1}{"x":2}'
+    }
+
+    @Unroll
+    void "JSON error can still be streamed using Flowable as container"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+
+        when:
+        myClient.someJsonErrorCollection()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Bad Request"
+        e.response.body.orElseThrow(() -> new RuntimeException()) != '{}'
+    }
+
+    @Unroll
+    void "JSON stream error can still be streamed using Flowable as container"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+
+        when:
+        myClient.someJsonStreamErrorCollection()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Bad Request"
+        e.response.body.orElseThrow(() -> new RuntimeException()) != '{}'
+    }
+
     @Client('/stream')
     static interface StreamEchoClient {
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
@@ -152,6 +188,15 @@ class StreamSpec extends Specification {
 
         @Get(value = "/someJsonCollection", consumes = MediaType.APPLICATION_JSON)
         String someJsonCollection();
+
+        @Get(value = "/someJsonStreamCollection", consumes = MediaType.APPLICATION_JSON_STREAM)
+        String someJsonStreamCollection();
+
+        @Get(value = "/someJsonErrorCollection", consumes = MediaType.APPLICATION_JSON)
+        String someJsonErrorCollection();
+
+        @Get(value = "/someJsonStreamErrorCollection", consumes = MediaType.APPLICATION_JSON_STREAM)
+        String someJsonStreamErrorCollection();
     }
 
     static class Elephant {
@@ -195,6 +240,21 @@ class StreamSpec extends Specification {
         @Get(value = "/someJsonCollection", produces = MediaType.APPLICATION_JSON)
         HttpResponse<Flowable<String>> someJsonCollection() {
             return HttpResponse.ok(Flowable.just('{"x":1}','{"x":2}'))
+        }
+
+        @Get(value = "/someJsonStreamCollection", produces = MediaType.APPLICATION_JSON_STREAM)
+        HttpResponse<Flowable<String>> someJsonStreamCollection() {
+            return HttpResponse.ok(Flowable.just('{"x":1}','{"x":2}'))
+        }
+
+        @Get(value = "/someJsonErrorCollection", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Flowable<String>> someJsonErrorCollection() {
+            return HttpResponse.badRequest(Flowable.just('{"x":1}','{"x":2}'))
+        }
+
+        @Get(value = "/someJsonStreamErrorCollection", produces = MediaType.APPLICATION_JSON_STREAM)
+        HttpResponse<Flowable<String>> someJsonStreamErrorCollection() {
+            return HttpResponse.badRequest(Flowable.just('{"x":1}','{"x":2}'))
         }
 
         private static ByteBuf byteBuf(String s) {

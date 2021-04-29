@@ -148,7 +148,6 @@ class StreamSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad Request"
         e.response.body.orElseThrow(() -> new RuntimeException()) != '{}'
     }
 
@@ -162,7 +161,6 @@ class StreamSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad Request"
         e.response.body.orElseThrow(() -> new RuntimeException()) != '{}'
     }
 
